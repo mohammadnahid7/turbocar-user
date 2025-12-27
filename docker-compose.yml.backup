@@ -1,0 +1,60 @@
+services:
+
+  redis-db:
+    image: redis:latest
+    container_name: redisemail
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: "root"
+    networks:
+      - wegugin
+
+  # PostgreSQL removed - using system PostgreSQL service instead
+  # Make sure your .env has PDB_HOST=host.docker.internal or your host IP
+  # For Linux, use host network mode or connect from host machine directly
+
+  migrate:
+    image: migrate/migrate
+    network_mode: host
+    volumes:
+      - ./migrations:/migrations
+    command: ["-path", "/migrations", "-database" ,"postgres://${PDB_USER}:${PDB_PASSWORD}@localhost:${PDB_PORT}/${PDB_NAME}?sslmode=disable","up"]
+
+  userservice:
+    container_name: auth
+    build: .
+    ports:
+      - "8080:8080"
+      - "8085:8085"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_ACCESS_KEY}
+    command: server /data --console-address ":9001"
+    networks:
+      - wegugin
+    restart: unless-stopped
+
+networks:
+  wegugin:
+    external: true
+
+volumes:
+  minio_data:
+    driver: local
+  db:
+    driver: local
+
