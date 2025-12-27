@@ -11,9 +11,10 @@ RUN go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -C ./cmd -a -installsuffix cgo -o ./../myapp .
 
-FROM golang:1.23.4-alpine AS migrate-builder
+FROM golang:1.24-alpine AS migrate-builder
 
 # Install migrate tool in builder stage
+# Using specific version compatible with Go 1.24+
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 FROM alpine:latest
