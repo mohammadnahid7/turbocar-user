@@ -6,7 +6,8 @@ COPY . .
 
 RUN go mod download
 
-COPY .env .
+# Note: .env file is not needed - Railway uses environment variables directly
+# The app will use env vars from Railway, godotenv.Load will just log if .env is missing
 
 RUN CGO_ENABLED=0 GOOS=linux go build -C ./cmd -a -installsuffix cgo -o ./../myapp .
 
@@ -17,7 +18,7 @@ WORKDIR /app
 COPY --from=builder /app/myapp .
 COPY --from=builder /app/api/email/template.html ./api/email/
 COPY --from=builder /app/app.log ./
-COPY --from=builder /app/.env .
+# Note: .env file is not copied - Railway uses environment variables directly
 
 EXPOSE 8080
 
