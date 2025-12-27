@@ -35,4 +35,5 @@ COPY --from=builder /app/migrations ./migrations
 EXPOSE 8080
 
 # Run migrations before starting the app
-CMD sh -c 'if [ -n "$DATABASE_URL" ]; then migrate -path migrations -database "$DATABASE_URL" up 2>&1 || echo "Migrations completed or already applied"; fi && ./myapp'
+# Note: Railway provides DATABASE_URL automatically for PostgreSQL
+CMD sh -c 'echo "Checking for DATABASE_URL..."; if [ -n "$DATABASE_URL" ]; then echo "Running migrations with DATABASE_URL..."; migrate -path migrations -database "$DATABASE_URL" up; MIGRATE_EXIT=$?; if [ $MIGRATE_EXIT -eq 0 ]; then echo "Migrations completed successfully!"; elif [ $MIGRATE_EXIT -eq 1 ]; then echo "Migration error occurred!"; exit 1; else echo "Migrations already applied or no change needed (exit code: $MIGRATE_EXIT)"; fi; else echo "ERROR: DATABASE_URL not set! Cannot run migrations."; exit 1; fi && echo "Starting application..." && ./myapp'
