@@ -60,8 +60,8 @@ func Load() *Config {
 	return &Config{
 		Postgres: getPostgresConfig(),
 		Server: ServerConfig{
-			USER_SERVICE: getPort("USER_SERVICE", "8085"),
-			USER_ROUTER:  getPort("USER_ROUTER", "8080"),
+			USER_SERVICE: getGRPCPort("USER_SERVICE", "8085"),
+			USER_ROUTER:  getHTTPPort("USER_ROUTER", "8080"),
 		},
 		Token: TokensConfig{
 			TOKEN_KEY: cast.ToString(coalesce("TOKEN_KEY", "your_secret_key")),
@@ -142,13 +142,29 @@ func getPostgresConfig() PostgresConfig {
 	}
 }
 
-// getPort returns the port with ":" prefix, checking PORT env var first (Railway compatibility)
-func getPort(envKey string, defaultPort string) string {
-	// Railway sets PORT environment variable
+// getHTTPPort returns the port for HTTP server, checking Railway's PORT env var first
+func getHTTPPort(envKey string, defaultPort string) string {
+	// Railway sets PORT environment variable - use it for HTTP server
 	if port := os.Getenv("PORT"); port != "" {
 		return ":" + port
 	}
 	// Check for custom env var
+	if port := os.Getenv(envKey); port != "" {
+		if port[0] != ':' {
+			return ":" + port
+		}
+		return port
+	}
+	// Return default with ":"
+	if defaultPort[0] != ':' {
+		return ":" + defaultPort
+	}
+	return defaultPort
+}
+
+// getGRPCPort returns the port for gRPC server (doesn't use Railway's PORT)
+func getGRPCPort(envKey string, defaultPort string) string {
+	// Check for custom env var (don't use Railway's PORT for gRPC)
 	if port := os.Getenv(envKey); port != "" {
 		if port[0] != ':' {
 			return ":" + port
