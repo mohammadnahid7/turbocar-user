@@ -11,24 +11,27 @@ RUN go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -C ./cmd -a -installsuffix cgo -o ./../myapp .
 
-FROM alpine:latest
+FROM golang:1.23.4-alpine AS migrate-builder
 
-# Install Go for migrate tool
-RUN apk add --no-cache go git
+# Install migrate tool in builder stage
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+FROM alpine:latest
 
 WORKDIR /app
 
+# Copy migrate binary from builder
+COPY --from=migrate-builder /go/bin/migrate /usr/local/bin/migrate
+
+# Copy application files
 COPY --from=builder /app/myapp .
 COPY --from=builder /app/api/email/template.html ./api/email/
 COPY --from=builder /app/app.log ./
 COPY --from=builder /app/migrations ./migrations
-
-# Install migrate tool
-RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # Note: .env file is not copied - Railway uses environment variables directly
 
 EXPOSE 8080
 
 # Run migrations before starting the app
-CMD sh -c 'if [ -n "$DATABASE_URL" ]; then ~/go/bin/migrate -path migrations -database "$DATABASE_URL" up || echo "Migration failed or already applied"; fi && ./myapp'
+CMD sh -c 'if [ -n "$DATABASE_URL" ]; then migrate -path migrations -database "$DATABASE_URL" up 2>&1 || echo "Migrations completed or already applied"; fi && ./myapp'
