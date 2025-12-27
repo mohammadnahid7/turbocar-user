@@ -58,16 +58,10 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Postgres: PostgresConfig{
-			PDB_HOST:     cast.ToString(coalesce("PDB_HOST", "localhost")),
-			PDB_PORT:     cast.ToString(coalesce("PDB_PORT", "5432")),
-			PDB_USER:     cast.ToString(coalesce("PDB_USER", "postgres")),
-			PDB_NAME:     cast.ToString(coalesce("PDB_NAME", "postgres")),
-			PDB_PASSWORD: cast.ToString(coalesce("PDB_PASSWORD", "3333")),
-		},
+		Postgres: getPostgresConfig(),
 		Server: ServerConfig{
-			USER_SERVICE: cast.ToString(coalesce("USER_SERVICE", ":1234")),
-			USER_ROUTER:  cast.ToString(coalesce("USER_ROUTER", ":1234")),
+			USER_SERVICE: getPort("USER_SERVICE", "8085"),
+			USER_ROUTER:  getPort("USER_ROUTER", "8080"),
 		},
 		Token: TokensConfig{
 			TOKEN_KEY: cast.ToString(coalesce("TOKEN_KEY", "your_secret_key")),
@@ -96,4 +90,74 @@ func coalesce(key string, value interface{}) interface{} {
 		return val
 	}
 	return value
+}
+
+// getPostgresConfig returns PostgreSQL configuration, checking Railway's DATABASE_URL first
+func getPostgresConfig() PostgresConfig {
+	// Railway provides DATABASE_URL in format: postgres://user:password@host:port/dbname
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		// Parse DATABASE_URL
+		// Format: postgres://user:password@host:port/dbname?sslmode=disable
+		// We'll extract components or use the URL directly
+		// For now, try to parse it
+		host := cast.ToString(coalesce("PGHOST", coalesce("PDB_HOST", "localhost")))
+		port := cast.ToString(coalesce("PGPORT", coalesce("PDB_PORT", "5432")))
+		user := cast.ToString(coalesce("PGUSER", coalesce("PDB_USER", "postgres")))
+		dbname := cast.ToString(coalesce("PGDATABASE", coalesce("PDB_NAME", "postgres")))
+		password := cast.ToString(coalesce("PGPASSWORD", coalesce("PDB_PASSWORD", "")))
+		
+		// Railway also provides individual variables, check those first
+		if os.Getenv("PGHOST") != "" {
+			host = cast.ToString(coalesce("PGHOST", "localhost"))
+		}
+		if os.Getenv("PGPORT") != "" {
+			port = cast.ToString(coalesce("PGPORT", "5432"))
+		}
+		if os.Getenv("PGUSER") != "" {
+			user = cast.ToString(coalesce("PGUSER", "postgres"))
+		}
+		if os.Getenv("PGDATABASE") != "" {
+			dbname = cast.ToString(coalesce("PGDATABASE", "postgres"))
+		}
+		if os.Getenv("PGPASSWORD") != "" {
+			password = cast.ToString(coalesce("PGPASSWORD", ""))
+		}
+		
+		return PostgresConfig{
+			PDB_HOST:     host,
+			PDB_PORT:     port,
+			PDB_USER:     user,
+			PDB_NAME:     dbname,
+			PDB_PASSWORD: password,
+		}
+	}
+	
+	// Fallback to individual variables or defaults
+	return PostgresConfig{
+		PDB_HOST:     cast.ToString(coalesce("PDB_HOST", "localhost")),
+		PDB_PORT:     cast.ToString(coalesce("PDB_PORT", "5432")),
+		PDB_USER:     cast.ToString(coalesce("PDB_USER", "postgres")),
+		PDB_NAME:     cast.ToString(coalesce("PDB_NAME", "postgres")),
+		PDB_PASSWORD: cast.ToString(coalesce("PDB_PASSWORD", "3333")),
+	}
+}
+
+// getPort returns the port with ":" prefix, checking PORT env var first (Railway compatibility)
+func getPort(envKey string, defaultPort string) string {
+	// Railway sets PORT environment variable
+	if port := os.Getenv("PORT"); port != "" {
+		return ":" + port
+	}
+	// Check for custom env var
+	if port := os.Getenv(envKey); port != "" {
+		if port[0] != ':' {
+			return ":" + port
+		}
+		return port
+	}
+	// Return default with ":"
+	if defaultPort[0] != ':' {
+		return ":" + defaultPort
+	}
+	return defaultPort
 }
