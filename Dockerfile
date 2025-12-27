@@ -1,4 +1,4 @@
-FROM golang:1.23.4 AS builder
+FROM golang:1.24 AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -C ./cmd -a -installsuffix cgo -o ./../mya
 FROM golang:1.24-alpine AS migrate-builder
 
 # Install migrate tool in builder stage
-# Using specific version compatible with Go 1.24+
+# Using latest version which requires Go 1.24+
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 FROM alpine:latest
